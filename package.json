@@ -1,0 +1,53 @@
+{
+  "name": "tabhero",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "license": "MIT",
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=26.13.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n worklet,vite \"yarn build:worklet --watch\" \"vite\"",
+    "build": "yarn build:worklet && yarn typecheck && vite build",
+    "build:worklet": "vite build --config vite.worklet.config.ts",
+    "zip": "yarn build && node -e \"const v=require('./package.json').version;require('child_process').execSync('cd dist && zip -r ../tabhero-'+v+'.zip .',{stdio:'inherit'})\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worklet.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "quality": "tsx quality/run.ts",
+    "licenses:check": "license-checker-rseidelsohn --production --excludePrivatePackages --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD'"
+  },
+  "dependencies": {
+    "fft.js": "^4.0.4",
+    "meyda": "^5.6.3",
+    "pitchy": "^4.1.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^3.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "license-checker-rseidelsohn": "^5.0.1",
+    "prettier": "^3.9.10",
+    "standardized-audio-context-mock": "^10.0.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0",
+    "wavefile": "^11.0.0"
+  }
+}

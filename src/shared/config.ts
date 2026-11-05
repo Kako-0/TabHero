@@ -1,0 +1,40 @@
+export const CONFIG = {
+  DELAY_S: 1.5, // atraso do áudio e do vídeo
+  VISIBLE_LEAD_S: 1.25, // quanto tempo a nota leva do topo da pista até a linha de acerto
+  COUNTDOWN_S: 3.0,
+  VIDEO_PLAY_AT_COUNTDOWN_S: 1.5, // video.play() nesse instante da contagem → som começa no "GO"
+  SYNC_AFTER_SEEK_S: 1.5,
+
+  ANALYSIS_SR: 22050,
+  FFT_SIZE: 2048,
+  HOP: 256,
+  ANALYSIS_LOOKAHEAD_S: 0.2,
+  ONSET_MIN_GAP_S: 0.06,
+  LANE_MIN_GAP_S: 0.1,
+  MAX_NOTES_PER_S: 8,
+  LANE_WINDOW_S: 8,
+  BLANK_AFTER_RESET_S: 2,
+  SUSTAIN_MIN_S: 0.4,
+  SUSTAIN_ENERGY_RATIO: 0.6,
+  SUSTAIN_PITCH_TOLERANCE_SEMITONES: 1,
+  SUSTAIN_EXTEND_INTERVAL_S: 0.05,
+
+  LANES: 4,
+  KEYS: ["KeyD", "KeyF", "KeyJ", "KeyK"] as const,
+  WINDOW_PERFECT_S: 0.045,
+  WINDOW_GOOD_S: 0.09,
+  WINDOW_MISS_S: 0.135,
+  SUSTAIN_TICK_S: 0.1,
+  SUSTAIN_RELEASE_TOLERANCE_S: 0.09,
+  SCORE_PERFECT: 100,
+  SCORE_GOOD: 50,
+  SCORE_TICK: 10,
+  COMBO_STEP: 10,
+  MAX_MULTIPLIER: 4,
+
+  FRAME_W: 640,
+  FRAME_H: 360,
+  FRAME_BUFFER_S: 1.6,
+  VIDEO_DIM: 0.4,
+  OUTPUT_LATENCY_POLL_MS: 2000,
+} as const;

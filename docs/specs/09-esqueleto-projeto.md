@@ -22,6 +22,7 @@ Versões mais recentes estáveis em **2026-11-05** (conferidas no registro do np
 | React / React DOM | ^19.3.1 | UI do overlay |
 | `@types/react` / `@types/react-dom` | ^19.3.0 | — |
 | `@types/chrome` | ^0.3.7 | Tipos das APIs de extensão |
+| `@types/node` | ^26.6.6 | Tipos de Node para configs do Vite, `quality/` e testes (adicionado no setup) |
 | Vitest | ^5.1.0 | Testes unitários |
 | `standardized-audio-context-mock` | ^10.0.1 | Mock de Web Audio nos testes (MIT) |
 | `tsx` | ^4.23.15 | Executar `quality/run.ts` |
@@ -107,6 +108,7 @@ Os nomes de arquivo das specs 01–08 seguem esta árvore. Arquivos novos entram
   "private": true,
   "type": "module",
   "version": "0.0.1",
+  "license": "MIT",
   "packageManager": "yarn@1.22.22",
   "engines": { "node": ">=26.13.0" },
   "scripts": {
@@ -120,12 +122,14 @@ Os nomes de arquivo das specs 01–08 seguem esta árvore. Arquivos novos entram
     "test": "vitest run",
     "test:watch": "vitest",
     "quality": "tsx quality/run.ts",
-    "licenses": "license-checker-rseidelsohn --production --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD'"
+    "licenses:check": "license-checker-rseidelsohn --production --excludePrivatePackages --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD'"
   }
 }
 ```
 
 Os argumentos são repassados direto, sem `--`: `yarn quality --update-baseline`.
+
+> **Nota do setup:** o script de licenças se chama `licenses:check` porque `yarn licenses` é um comando nativo do Yarn 1 e tem precedência sobre scripts. `--excludePrivatePackages` exclui o próprio `tabhero` (privado, reportado como `UNLICENSED`).
 
 ## Manifest (`manifest.config.ts`)
 
@@ -173,11 +177,11 @@ export default defineConfig({
 - `public/analyzer.worklet.js` é artefato de build e fica no `.gitignore`.
 - Carregamento (stub em `audioGraph.ts`): `ctx.audioWorklet.addModule(chrome.runtime.getURL("analyzer.worklet.js"))`.
 - O worklet importa `src/analysis/*` e `src/shared/*`. Esses módulos **não podem** referenciar `window`, `document` nem tipos DOM; o `tsconfig.worklet.json` garante isso no typecheck.
-- **Vite 8 usa Rolldown:** opções avançadas vão em `build.rolldownOptions` (não `rollupOptions`). Verificar no setup se o modo `lib` + `iife` gera um arquivo único sem `import`.
+- **Vite 8 usa Rolldown:** opções avançadas vão em `build.rolldownOptions` (não `rollupOptions`). **Verificado no setup:** o modo `lib` + `iife` gera um único `analyzer.worklet.js` sem `import`, com `src/analysis` e `src/shared` embutidos.
 
 ## TypeScript
-- `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `moduleResolution: "bundler"`, `jsx: "react-jsx"`, `types: ["chrome", "vite/client"]`, alias `@/*` → `src/*`.
-- `tsconfig.worklet.json`: `include: ["src/worklet", "src/analysis", "src/shared"]`, `lib: ["ES2022"]`, sem `"DOM"`. Tipos do `AudioWorkletGlobalScope` (`registerProcessor`, `AudioWorkletProcessor`, `currentFrame`, `sampleRate`) declarados em `src/worklet/worklet-globals.d.ts`.
+- `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `moduleResolution: "bundler"`, `jsx: "react-jsx"`, `types: ["chrome", "vite/client", "node"]`, `allowImportingTsExtensions` (para `import "./manifest.config.ts"` no `vite.config.ts`, exigido pelo config loader nativo do Vite 8), alias `@/*` → `src/*`. Exclui `src/worklet`.
+- `tsconfig.worklet.json`: `include: ["src/worklet", "src/analysis", "src/shared"]`, `lib: ["ES2022"]`, sem `"DOM"`. Tipos do `AudioWorkletGlobalScope` (`registerProcessor`, `AudioWorkletProcessor`, `currentFrame`, `sampleRate`) declarados em `src/worklet/worklet-globals.d.ts`. Os tipos de `import.meta.env` ficam em `src/shared/env.d.ts` (sem `vite/client`, que puxa DOM), para `log.ts` funcionar nos dois tsconfigs.
 
 ## Testes (`vitest.config.ts`)
 - `environment: "node"` por padrão (analysis, game e clock usam mocks).
@@ -193,7 +197,7 @@ Em todo push/PR: `actions/setup-node` com `node-version-file: .nvmrc`, `corepack
 1. `yarn lint`
 2. `yarn typecheck`
 3. `yarn test`
-4. `yarn licenses`
+4. `yarn licenses:check`
 5. `yarn quality` (com dataset vazio, passa; a partir do M1, compara com a baseline)
 6. `yarn build` e upload de `dist/` como artefato
 
@@ -212,5 +216,5 @@ Em todo push/PR: `actions/setup-node` com `node-version-file: .nvmrc`, `corepack
 - [ ] Clicar no botão cria o `AudioContext` e **carrega o worklet no-op sem erro** (log `[TabHero] worklet ok`). Se falhar, registrar o erro no SPIKE 1 da spec 01.
 - [ ] Clicar no botão monta o overlay (Shadow DOM) com o texto "TabHero" sobre o player; um segundo clique remove.
 - [ ] `yarn typecheck` falha se `src/analysis/` usar `window` (verificar com um teste negativo manual).
-- [ ] `yarn test`, `yarn lint`, `yarn licenses` e `yarn quality` passam.
+- [ ] `yarn test`, `yarn lint`, `yarn licenses:check` e `yarn quality` passam.
 - [ ] CI verde no primeiro PR.

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.zip
+package-lock.json
+public/analyzer.worklet.js
+quality/report.md
+# áudio não redistribuível do dataset de qualidade (spec 08)
+quality/dataset/**/audio.wav
+*.tsbuildinfo
+.env.local

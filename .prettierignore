@@ -1,0 +1,5 @@
+dist/
+public/analyzer.worklet.js
+yarn.lock
+docs/
+*.md
