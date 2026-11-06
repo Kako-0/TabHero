@@ -94,5 +94,7 @@ Se a `ctx` sair de `running` sem o jogo ter pedido (`interrupted`, ou suspensa p
    3. fallback: `AnalyserNode` + análise no main thread a cada `rAF` (degrada a precisão; registrar a decisão aqui).
 
    Verificar também se o Meyda e o `pitchy` executam em `AudioWorkletGlobalScope` (sem `window`).
+
+   **Resposta parcial (setup, spec 09):** a opção 1 funciona. Com o worklet no-op, `addModule(chrome.runtime.getURL(...))` + `new AudioWorkletNode(ctx, "tabhero-analyzer")` carregam sem erro num `/watch` (log `[TabHero] worklet ok`). As opções 2 e 3 não são necessárias. **Pendente:** Meyda e `pitchy` dentro do worklet (no M0/M1, quando entrarem no bundle).
 2. **SPIKE: `video.volume`/`muted` afetam a saída da `MediaElementSource`?** Se afetam, a análise sofre com volume baixo, e não há como capturar o sinal antes do volume. Mitigação: normalizar o sinal no analisador (ganho automático por RMS móvel) e, com `muted`/volume 0, mostrar o aviso "Ative o som do vídeo para jogar".
 3. **SPIKE: `outputLatency` vs `getOutputTimestamp()`.** Ver 02.

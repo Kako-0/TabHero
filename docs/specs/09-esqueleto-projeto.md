@@ -209,12 +209,12 @@ Em todo push/PR: `actions/setup-node` com `node-version-file: .nvmrc`, `corepack
 5. Abrir um vídeo em `youtube.com/watch`. O HMR do crxjs recarrega o content script. Mudanças no worklet exigem recarregar a aba.
 
 ## Critérios de aceite
-- [ ] `corepack enable && yarn install && yarn build` gera `dist/` com `manifest.json`, `analyzer.worklet.js` e os ícones.
-- [ ] `yarn install --frozen-lockfile` passa num clone limpo (lockfile consistente).
-- [ ] `yarn --version` no projeto retorna `1.22.22`.
-- [ ] A extensão carregada sem compactação, num `/watch`, mostra o botão placeholder na barra do player, inclusive após navegação SPA entre vídeos.
-- [ ] Clicar no botão cria o `AudioContext` e **carrega o worklet no-op sem erro** (log `[TabHero] worklet ok`). Se falhar, registrar o erro no SPIKE 1 da spec 01.
-- [ ] Clicar no botão monta o overlay (Shadow DOM) com o texto "TabHero" sobre o player; um segundo clique remove.
-- [ ] `yarn typecheck` falha se `src/analysis/` usar `window` (verificar com um teste negativo manual).
-- [ ] `yarn test`, `yarn lint`, `yarn licenses:check` e `yarn quality` passam.
-- [ ] CI verde no primeiro PR.
+- [x] `corepack enable && yarn install && yarn build` gera `dist/` com `manifest.json`, `analyzer.worklet.js` e os ícones.
+- [x] `yarn install --frozen-lockfile` passa num clone limpo (lockfile consistente).
+- [x] `yarn --version` no projeto retorna `1.22.22`.
+- [x] A extensão carregada sem compactação, num `/watch`, mostra o botão placeholder na barra do player, inclusive após navegação SPA entre vídeos.
+- [x] Clicar no botão cria o `AudioContext` e **carrega o worklet no-op sem erro** (log `[TabHero] worklet ok`). Se falhar, registrar o erro no SPIKE 1 da spec 01.
+- [x] Clicar no botão monta o overlay (Shadow DOM) com o texto "TabHero" sobre o player; um segundo clique remove.
+- [x] `yarn typecheck` falha se `src/analysis/` usar `window` (verificar com um teste negativo manual).
+- [x] `yarn test`, `yarn lint`, `yarn licenses:check` e `yarn quality` passam.
+- [x] CI verde no primeiro PR.
