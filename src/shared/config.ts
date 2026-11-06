@@ -1,3 +1,6 @@
+/** SPIKE 1 da spec 02: qual fonte de latência de saída o relógio aplica. */
+export type LatencySource = "output-latency" | "output-timestamp";
+
 export const CONFIG = {
   DELAY_S: 1.5, // atraso do áudio e do vídeo
   VISIBLE_LEAD_S: 1.25, // quanto tempo a nota leva do topo da pista até a linha de acerto
@@ -41,4 +44,11 @@ export const CONFIG = {
   FRAME_BUFFER_S: 1.6,
   VIDEO_DIM: 0.4,
   OUTPUT_LATENCY_POLL_MS: 2000,
+  LATENCY_SOURCE: "output-latency" as LatencySource, // A = outputLatency+baseLatency; B = getOutputTimestamp
+
+  CLOCK_WINDOW: 60, // amostras (rAF) na regressão perf → procTime
+  CLOCK_MIN_SAMPLES: 10, // abaixo disso: última amostra + Δperf
+  CLOCK_SLOPE_MIN: 0.999, // inclinação (s de ctx por s de perf) travada nesse intervalo
+  CLOCK_SLOPE_MAX: 1.001,
+  CLOCK_OUTLIER_S: 0.05, // amostra fora da reta por mais que isso → resync automático
 } as const;
