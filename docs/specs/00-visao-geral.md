@@ -55,6 +55,10 @@ export const CONFIG = {
   FFT_SIZE: 2048,
   HOP: 256,
   ANALYSIS_LOOKAHEAD_S: 0.2,
+  AGC_TARGET_RMS: 0.1,        // ganho automático na entrada do analisador (independe de video.volume)
+  AGC_TAU_S: 3,
+  AGC_MAX_GAIN: 1000,         // +60 dB
+  AGC_SILENCE_RMS: 1e-5,      // −100 dBFS: abaixo disso o ganho fica congelado
   ONSET_MIN_GAP_S: 0.06,
   LANE_MIN_GAP_S: 0.1,
   MAX_NOTES_PER_S: 8,

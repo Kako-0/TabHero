@@ -34,6 +34,8 @@ export class AudioGraphError extends Error {
 }
 ```
 
+**Implementação:** `AudioGraph` é uma classe (`extends EventTarget`) com construtor privado; `"context-interrupted"` é exportado como `CONTEXT_INTERRUPTED`. As mensagens de erro de cada `code` estão em `STRINGS.errors`.
+
 ## Comportamento
 
 ### Topologia
@@ -66,6 +68,15 @@ mode = "game":          source ──┬──► analyzerNode (AudioWorkletNode
 ### `statechange`
 Se a `ctx` sair de `running` sem o jogo ter pedido (`interrupted`, ou suspensa pelo sistema), emitir o evento `"context-interrupted"`; o jogo trata como pause (05).
 
+### Notas de implementação
+- O `AudioWorkletNode` também fica na `WeakMap` e é reaproveitado entre `attach`s (o `process()` devolve `true`, então criar um por `attach` deixaria processors órfãos). Em consequência, `analyzerPort` é o mesmo entre `attach`s do mesmo vídeo.
+- Logo após criar a source, ela é ligada em `source → destination`: se o worklet falhar (`WORKLET_LOAD_FAILED`), o vídeo continua com som e o próximo `attach` tenta carregar o worklet de novo.
+- `SOURCE_TAKEN` fecha a `AudioContext` recém-criada.
+- `flush()` também desliga `source → delay antigo` (só `delayNode.disconnect()` deixaria o nó antigo recebendo áudio). Em `passthrough`, o delay novo é criado mas não ligado.
+- `setMode` só liga e desliga arestas; os nós (`delay`, `masterGain`) são criados uma vez por `AudioGraph`.
+- A rampa de latência é o `LatencySmoother` (primeira medida aplicada direto; depois, no máximo 5ms/s nos dois sentidos).
+- Build de dev (`VITE_DEBUG=true`): o clique em "Jogar" já põe o grafo em `game`, para o teste manual de atraso do M0.
+
 ## Erros e casos de borda
 | Caso | Comportamento |
 | :--- | :--- |
@@ -97,4 +108,8 @@ Se a `ctx` sair de `running` sem o jogo ter pedido (`interrupted`, ou suspensa p
 
    **Resposta parcial (setup, spec 09):** a opção 1 funciona. Com o worklet no-op, `addModule(chrome.runtime.getURL(...))` + `new AudioWorkletNode(ctx, "tabhero-analyzer")` carregam sem erro num `/watch` (log `[TabHero] worklet ok`). As opções 2 e 3 não são necessárias. **Pendente:** Meyda e `pitchy` dentro do worklet (no M0/M1, quando entrarem no bundle).
 2. **SPIKE: `video.volume`/`muted` afetam a saída da `MediaElementSource`?** Se afetam, a análise sofre com volume baixo, e não há como capturar o sinal antes do volume. Mitigação: normalizar o sinal no analisador (ganho automático por RMS móvel) e, com `muted`/volume 0, mostrar o aviso "Ative o som do vídeo para jogar".
+
+   **Resposta (M0):** **afetam.** O volume do player do YouTube (`video.volume`) e o mudo (`video.muted`) são aplicados antes da `MediaElementSource`. Testado no `/watch` em modo `game`: baixar o volume baixa o som atrasado, e o mudo o silencia. A mitigação foi implementada:
+   - `src/analysis/autoGain.ts`: ganho automático na entrada do `StreamAnalyzer` (spec 04, etapa 0).
+   - `src/content/soundCheck.ts` + `App`: com `muted` ou `volume === 0`, o overlay mostra `STRINGS.soundOffWarning` ("Ative o som do vídeo para jogar") e atualiza em `volumechange`.
 3. **SPIKE: `outputLatency` vs `getOutputTimestamp()`.** Ver 02.

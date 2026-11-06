@@ -56,6 +56,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: {
 | `AD` | Faixa discreta no topo: "Anúncio — o jogo continua depois"; `pointer-events: none` |
 | `RESULTS` | Score, precisão `(perfect + 0,5·good) / total`, Perfect/Good/Miss, maior combo; botões **Jogar de novo** e **Sair** |
 | `ERROR` | Mensagem de `strings.ts` (ex.: `SOURCE_TAKEN`) + **Sair** |
+| (qualquer estado, vídeo mudo ou volume 0) | Faixa no topo: "Ative o som do vídeo para jogar" (`role="status"`). Some quando o som volta (`volumechange`). Ver 01, SPIKE 2 |
 
 Botão "Jogar" (fora do overlay; ver 06): tooltip "Jogar TabHero".
 

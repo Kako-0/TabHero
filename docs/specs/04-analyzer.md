@@ -38,6 +38,13 @@ Worklet: em `process(inputs)`, faz downmix dos canais para mono e chama `push(mo
 
 ## Pipeline
 
+### 0. Normalização de volume (`autoGain.ts`)
+O sinal chega já multiplicado por `video.volume` (spec 01, SPIKE 2), e o `log(1 + 10·|X|)` do flux não é invariante à escala. Por isso, antes de tudo:
+- Ganho = `AGC_TARGET_RMS / √(média móvel do quadrado)`, com média exponencial de constante `AGC_TAU_S` (3s) e limite `AGC_MAX_GAIN` (+60 dB).
+- Blocos com RMS < `AGC_SILENCE_RMS` (−100 dBFS; ex.: mudo) não atualizam a média, e o ganho fica congelado.
+- A média é no domínio linear, robusta a trechos quietos da música. Consequência: subir o volume converge rápido (< 3× o alvo em 0,5s), e baixar o volume 20× leva ~8 τ (~24s) para convergir (−6 dB em 5 τ). Os limiares adaptativos absorvem essa diferença.
+- O ganho **não** é zerado em `reset` (o volume do usuário não muda com o seek).
+
 ### 1. Reamostragem e quadros
 - Reamostragem linear para 22.050 Hz (suficiente para as features usadas). Cada quadro de análise guarda o `procTime` da sua **amostra central**.
 - Quadro = 2048 amostras, hop = 256 (~11,6ms; ~86 quadros/s).
