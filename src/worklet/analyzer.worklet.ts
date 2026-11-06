@@ -3,7 +3,7 @@ import { StreamAnalyzer } from "@/analysis/streamAnalyzer";
 import type { AnalyzerCmd } from "@/shared/types";
 
 class TabHeroAnalyzerProcessor extends AudioWorkletProcessor {
-  private readonly analyzer = new StreamAnalyzer();
+  private readonly analyzer = new StreamAnalyzer(sampleRate);
 
   constructor(options?: AudioWorkletNodeOptions) {
     super(options);
