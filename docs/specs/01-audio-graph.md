@@ -87,12 +87,12 @@ Se a `ctx` sair de `running` sem o jogo ter pedido (`interrupted`, ou suspensa p
 | Mídia cross-origin sem CORS | Fora do escopo (o YouTube usa MSE/blob) |
 
 ## Critérios de aceite
-- [ ] Em `passthrough`, o som do vídeo é indistinguível do normal (volume, sem atraso perceptível).
-- [ ] Em `game`, o som sai `DELAY_S` ± 20ms depois da imagem original (medido com vídeo de clap/flash).
-- [ ] `flush()` elimina o áudio antigo: nenhum som do trecho anterior ao seek é ouvido.
-- [ ] `suspend()` + `resume()` retoma o áudio atrasado sem salto audível (< 30ms de descontinuidade).
-- [ ] Alternar `game ↔ passthrough` 20 vezes não vaza nós (verificar no `chrome://media-internals` / heap).
-- [ ] `SOURCE_TAKEN` reproduzido com uma segunda instância (simular criando a source antes) → mensagem correta.
+- [x] Em `passthrough`, o som do vídeo é indistinguível do normal (volume, sem atraso perceptível).
+- [x] Em `game`, o som sai `DELAY_S` ± 20ms depois da imagem original (medido com vídeo de clap/flash).
+- [x] `flush()` elimina o áudio antigo: nenhum som do trecho anterior ao seek é ouvido.
+- [x] `suspend()` + `resume()` retoma o áudio atrasado sem salto audível (< 30ms de descontinuidade).
+- [x] Alternar `game ↔ passthrough` 20 vezes não vaza nós (verificar no `chrome://media-internals` / heap).
+- [x] `SOURCE_TAKEN` reproduzido com uma segunda instância (simular criando a source antes) → mensagem correta.
 
 ## Testes
 - **Unitário (Vitest + mock de Web Audio):** transições de modo, `flush` envia `reset`, dupla `attach` reutiliza a source.
