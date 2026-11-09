@@ -136,6 +136,7 @@ export class AudioGraph extends EventTarget {
   private delay: DelayNode;
   private readonly masterGain: GainNode;
   private readonly latency = new LatencySmoother();
+  private rmsTap: { node: AnalyserNode; buf: Float32Array<ArrayBuffer> } | null = null;
   private pollId: ReturnType<typeof setInterval> | null = null;
   private suspendRequested = false;
   private disposed = false;
@@ -226,6 +227,25 @@ export class AudioGraph extends EventTarget {
     return this.latency.value(performance.now());
   }
 
+  /**
+   * RMS do áudio sem atraso, numa janela de ~43ms (2048 amostras a 48 kHz). Usado pela
+   * detecção de DRM (spec 03). O AnalyserNode é criado no 1º uso e fica na saída da source.
+   */
+  inputRms(): number {
+    if (this.disposed) return 0;
+    if (!this.rmsTap) {
+      const node = this.ctx.createAnalyser();
+      node.fftSize = 2048;
+      this.source.connect(node);
+      this.rmsTap = { node, buf: new Float32Array(node.fftSize) };
+    }
+    const { node, buf } = this.rmsTap;
+    node.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i]! * buf[i]!;
+    return Math.sqrt(sum / buf.length);
+  }
+
   /** Volta a passthrough; NÃO destrói a MediaElementSource. */
   dispose(): void {
     if (this.disposed) return;
@@ -236,6 +256,8 @@ export class AudioGraph extends EventTarget {
     this.ctx.removeEventListener("statechange", this.onStateChange);
     this.delay.disconnect();
     this.masterGain.disconnect();
+    if (this.rmsTap) this.source.disconnect(this.rmsTap.node);
+    this.rmsTap = null;
   }
 
   private createDelay(): DelayNode {

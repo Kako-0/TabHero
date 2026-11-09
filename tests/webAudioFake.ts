@@ -49,6 +49,18 @@ export class FakeGainNode extends FakeNode {
   }
 }
 
+export class FakeAnalyserNode extends FakeNode {
+  fftSize = 2048;
+  /** Amostras devolvidas por getFloatTimeDomainData (repetidas). */
+  signal = 0;
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, "analyser");
+  }
+  getFloatTimeDomainData(buf: Float32Array): void {
+    buf.fill(this.signal);
+  }
+}
+
 export class FakePort {
   readonly sent: unknown[] = [];
   postMessage(msg: unknown): void {
@@ -111,6 +123,9 @@ export class FakeAudioContext extends EventTarget {
   }
   createGain(): FakeGainNode {
     return new FakeGainNode(this);
+  }
+  createAnalyser(): FakeAnalyserNode {
+    return new FakeAnalyserNode(this);
   }
   async resume(): Promise<void> {
     this.setState("running");

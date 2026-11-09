@@ -26,6 +26,7 @@ export interface AudioGraph {
   resume(): Promise<void>;
   /** Latência de saída estimada (s), atualizada a cada OUTPUT_LATENCY_POLL_MS. */
   getOutputLatency(): number;
+  inputRms(): number;                           // RMS do áudio sem atraso (detecção de DRM, spec 03)
   dispose(): void;   // volta a passthrough; NÃO destrói a MediaElementSource
 }
 

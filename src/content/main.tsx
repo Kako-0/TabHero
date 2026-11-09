@@ -1,8 +1,9 @@
 // Bootstrap do content script: encontra o player e injeta o botão placeholder.
-import { DEBUG, error, log } from "@/shared/log";
+import { DEBUG, error, log, warn } from "@/shared/log";
 import { AudioGraph, AudioGraphError } from "./audioGraph";
-import { createClock } from "./clock";
+import { createClock, type GameClock } from "./clock";
 import { isSoundOff, watchSound } from "./soundCheck";
+import { createVideoDelay } from "./videoDelay";
 import { mountOverlay, type OverlayHandle } from "./ui/mountOverlay";
 import { findPlayer, isWatchPage, onNavigateFinish, type YouTubePlayer } from "./youtube";
 
@@ -10,12 +11,24 @@ let player: YouTubePlayer | null = null;
 let overlay: OverlayHandle | null = null;
 let graph: AudioGraph | null = null;
 let stopSoundWatch: (() => void) | null = null;
-let stopClockDebug: (() => void) | null = null;
+let stopDebug: (() => void) | null = null;
 
 /** M0 (spec 02, SPIKE 1): amostra o relógio a cada rAF e loga as duas fontes de latência. */
-function startClockDebug(g: AudioGraph): () => void {
+function startClockDebug(
+  g: AudioGraph,
+  onTick?: (clock: GameClock, now: number) => void,
+): { clock: GameClock; stop: () => void } {
   // Janela de 10s do critério de aceite: desvio medido em todo frame.
-  const newWin = (start: number) => ({ start, n: 0, sum: 0, sumAbs: 0, maxAbs: 0, latA: 0, latB: 0, nB: 0 });
+  const newWin = (start: number) => ({
+    start,
+    n: 0,
+    sum: 0,
+    sumAbs: 0,
+    maxAbs: 0,
+    latA: 0,
+    latB: 0,
+    nB: 0,
+  });
   let win = newWin(performance.now());
   let winDirty = false; // houve resync/suspensão na janela → descarta
   const clock = createClock(g, {
@@ -71,17 +84,99 @@ function startClockDebug(g: AudioGraph): () => void {
         latencyB_ms: outputTimestamp === null ? null : (outputTimestamp * 1000).toFixed(1),
       });
     }
+    onTick?.(clock, now);
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(raf);
+  return { clock, stop: () => cancelAnimationFrame(raf) };
+}
+
+/**
+ * M0 (spec 03): esconde o <video> e desenha o vídeo atrasado num canvas atrás do overlay.
+ * Seek → flush + clear + resync (o que a spec 05 fará no SYNCING). Loga stats a cada 2s.
+ */
+function startVideoDebug(p: YouTubePlayer, g: AudioGraph, host: HTMLElement): () => void {
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;";
+  host.shadowRoot?.prepend(canvas);
+  const c2d = canvas.getContext("2d", { alpha: false })!;
+  let drawn: ImageBitmap | null = null;
+  let dimmed = false;
+  /** Frame → sem frame fora de seek/início: cada um é uma piscada visível. */
+  let gaps = 0;
+  let expectGap = true;
+  let lastLog = 0;
+
+  const { clock, stop: stopClock } = startClockDebug(g, (clk, now) => {
+    const dpr = Math.min(2, devicePixelRatio);
+    const w = Math.round(canvas.clientWidth * dpr);
+    const h = Math.round(canvas.clientHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      drawn = null;
+    }
+    const frame = vd.frameAt(clk.gameTime());
+    if (frame && frame !== drawn) {
+      // cover
+      const s = Math.max(w / frame.width, h / frame.height);
+      const fw = frame.width * s;
+      const fh = frame.height * s;
+      c2d.drawImage(frame, (w - fw) / 2, (h - fh) / 2, fw, fh);
+      drawn = frame;
+      dimmed = false;
+      expectGap = false;
+    } else if (!frame && !dimmed) {
+      if (!expectGap) {
+        gaps++;
+        warn("vídeo atrasado: sem frame (piscada)", { gameTime: clk.gameTime().toFixed(3) });
+      }
+      // Sem frame (início / após seek): mantém o último desenhado, escurecido (spec 07).
+      c2d.fillStyle = "rgba(0,0,0,0.5)";
+      c2d.fillRect(0, 0, w, h);
+      dimmed = true;
+      drawn = null;
+    }
+    if (now - lastLog >= 2000) {
+      lastLog = now;
+      const st = vd.stats;
+      log("vídeo atrasado", {
+        ...st,
+        approxMB: (st.approxBytes / 2 ** 20).toFixed(1),
+        leak: st.created - st.closed - st.frames,
+        gaps,
+        drmSuspected: vd.drmSuspected,
+      });
+    }
+  });
+
+  // Definido antes do 1º rAF (o tick acima só roda no próximo frame).
+  const vd = createVideoDelay(p.video, clock, { audioRms: () => g.inputRms() });
+  const onSeeking = () => {
+    expectGap = true;
+    g.flush();
+    vd.clear();
+    clock.resync();
+    log("vídeo atrasado: seek → flush/clear/resync");
+  };
+  p.video.addEventListener("seeking", onSeeking);
+  p.setGameActive(true);
+  vd.start();
+
+  return () => {
+    stopClock();
+    vd.stop();
+    p.video.removeEventListener("seeking", onSeeking);
+    p.setGameActive(false);
+    canvas.remove();
+  };
 }
 
 function closeOverlay() {
   stopSoundWatch?.();
   stopSoundWatch = null;
-  stopClockDebug?.();
-  stopClockDebug = null;
+  stopDebug?.();
+  stopDebug = null;
   graph?.dispose();
   graph = null;
   overlay?.unmount();
@@ -104,7 +199,7 @@ async function onPlayClick(p: YouTubePlayer) {
     // M0: em dev, liga o modo de jogo direto para medir o atraso (spec 01, teste manual).
     if (DEBUG) {
       g.setMode("game");
-      stopClockDebug = startClockDebug(g);
+      stopDebug = startVideoDebug(p, g, p.mountOverlayHost());
     }
   } catch (e) {
     // A UI de erro (07) mostra STRINGS.errors[e.code].

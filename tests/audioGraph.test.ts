@@ -8,6 +8,7 @@ import {
 import { CONFIG } from "@/shared/config";
 import {
   FakeAudioContext,
+  type FakeAnalyserNode,
   type FakeDelayNode,
   type FakeNode,
   type FakeWorkletNode,
@@ -247,5 +248,24 @@ describe("latência de saída", () => {
     expect(s.value(100_000)).toBe(0);
     s.setTarget(0.001, 100_000);
     expect(s.value(200_000)).toBeCloseTo(0.001, 9);
+  });
+});
+
+describe("inputRms (DRM, spec 03)", () => {
+  it("cria o AnalyserNode no 1º uso, na saída da source, e desliga no dispose", async () => {
+    const { g, ctx, source } = await attach();
+    expect(ctx.find("analyser")).toHaveLength(0);
+    expect(g.inputRms()).toBe(0);
+    const [an] = ctx.find("analyser") as [FakeAnalyserNode];
+    expect(source.outputs.has(an)).toBe(true);
+    an.signal = 0.5;
+    expect(g.inputRms()).toBeCloseTo(0.5, 6);
+    expect(ctx.find("analyser")).toHaveLength(1);
+    g.setMode("game");
+    g.setMode("passthrough");
+    expect(source.outputs.has(an)).toBe(true);
+    g.dispose();
+    expect(source.outputs.has(an)).toBe(false);
+    expect(g.inputRms()).toBe(0);
   });
 });

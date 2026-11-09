@@ -11,6 +11,11 @@ const SEL = {
 const FIND_TIMEOUT_MS = 10_000;
 const OVERLAY_HOST_ID = "tabhero-overlay-host";
 const BUTTON_CLASS = "tabhero-play";
+const ACTIVE_CLASS = "tabhero-active";
+const STYLE_ID = "tabhero-style";
+// Spec 03: o <video> original fica invisível (continua decodificando) e o jogo mostra a
+// cópia atrasada. O resto do CSS de partida (esconder controles etc.) entra com a spec 06.
+const ACTIVE_CSS = `#movie_player.${ACTIVE_CLASS} video.html5-main-video { opacity: 0 !important; }`;
 
 export interface YouTubePlayer {
   readonly video: HTMLVideoElement;
@@ -20,6 +25,8 @@ export interface YouTubePlayer {
   mountOverlayHost(): HTMLElement;
   unmountOverlayHost(): void;
   injectPlayButton(onClick: () => void): void;
+  /** Liga/desliga o CSS de partida (classe `tabhero-active` no #movie_player). */
+  setGameActive(active: boolean): void;
   dispose(): void;
 }
 
@@ -102,7 +109,17 @@ function createPlayer(playerEl: HTMLElement, video: HTMLVideoElement): YouTubePl
       buttonObserver = new MutationObserver(() => injectButton(onClick));
       buttonObserver.observe(playerEl, { childList: true, subtree: true });
     },
+    setGameActive(active) {
+      if (active && !document.getElementById(STYLE_ID)) {
+        const style = document.createElement("style");
+        style.id = STYLE_ID;
+        style.textContent = ACTIVE_CSS;
+        document.head.appendChild(style);
+      }
+      playerEl.classList.toggle(ACTIVE_CLASS, active);
+    },
     dispose() {
+      playerEl.classList.remove(ACTIVE_CLASS);
       buttonObserver?.disconnect();
       buttonObserver = null;
     },

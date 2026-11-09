@@ -41,7 +41,12 @@ export const CONFIG = {
 
   FRAME_W: 640,
   FRAME_H: 360,
-  FRAME_BUFFER_S: 1.6,
+  FRAME_BUFFER_S: 2.0, // teto de histórico: DELAY_S + latência de saída (até ~0,4s) + folga
+  FRAME_BUDGET_BYTES: 64 * 1024 * 1024, // acima disso, captura 1 a cada 2 frames (spec 03)
+  VIDEO_OFFSET_S: 0, // SPIKE 1 da spec 03: frame exibido vs áudio na MediaElementSource (medir com vídeo de clap)
+  DRM_CHECK_FRAMES: 10, // frames pretos seguidos, com áudio, para suspeitar de DRM
+  DRM_BLACK_MAX: 16, // canal (0–255) máximo de um pixel "preto"
+  DRM_AUDIO_RMS: 0.003, // ≈ −50 dBFS: abaixo disso o áudio conta como silêncio
   VIDEO_DIM: 0.4,
   OUTPUT_LATENCY_POLL_MS: 2000,
   LATENCY_SOURCE: "output-latency" as LatencySource, // A = outputLatency+baseLatency; B = getOutputTimestamp

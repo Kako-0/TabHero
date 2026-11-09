@@ -84,7 +84,7 @@ export const CONFIG = {
 
   FRAME_W: 640,
   FRAME_H: 360,
-  FRAME_BUFFER_S: 1.6,
+  FRAME_BUFFER_S: 2.0,
   VIDEO_DIM: 0.4,
   OUTPUT_LATENCY_POLL_MS: 2000,
 } as const;
