@@ -264,6 +264,12 @@ export class AudioGraph extends EventTarget {
     this.masterGain.disconnect();
     if (this.rmsTap) this.source.disconnect(this.rmsTap.node);
     this.rmsTap = null;
+    // Sair do jogo pausado deixaria a ctx suspensa: o <video> preso à MediaElementSource
+    // não avança (loading eterno no YouTube). Em passthrough a ctx precisa rodar.
+    this.suspendRequested = false;
+    if (this.ctx.state !== "running") {
+      this.ctx.resume().catch((e: unknown) => warn("ctx.resume() no dispose falhou", e));
+    }
   }
 
   private createDelay(): DelayNode {

@@ -67,7 +67,7 @@ export function createClock(
 - `sample()` faz `resync()` sozinho quando `ctx.state` muda (cobre `resume`/`suspend`/`interrupted`) e quando uma amostra cai a mais de `CLOCK_OUTLIER_S` da reta (troca de dispositivo, aba estrangulada). Após `flush()` o jogo chama `resync()` explicitamente. Dois `sample()` com o mesmo `perf` contam uma vez.
 - `gameTime()` tem trava monotônica: correções da regressão para trás de até `CLOCK_OUTLIER_S` são seguradas no último valor; uma maior passa (erro real). `gameTimeAt()` não tem a trava (input usa timestamps passados).
 - Fonte A = `graph.getOutputLatency()` (já suavizada no 01). Fonte B = mediana das últimas 60 medidas cruas (descarta `contextTime`/`performanceTime` zerados e valores fora de [0, 1s]) com o mesmo `LatencySmoother` de 5ms/s; até a primeira medida B válida, usa A.
-- Build de dev (`VITE_DEBUG=true`): o "Jogar" inicia um loop rAF que chama `sample()` e loga a cada 2s `gameTime`, desvio vs `currentTime` e as latências A e B — insumo para o SPIKE 1.
+- Build de dev (`VITE_DEBUG=true`): o "Jogar" inicia um loop rAF que chama `sample()` e loga a cada 2s `gameTime`, desvio vs `currentTime` e as latências A e B — insumo para o SPIKE 1. Desde a spec 06, o "Jogar" inicia a partida real (também no build de produção); o log de dev da partida, a cada 2s, traz estado, `gameTime`, desvio, latências A/B, score, combo, frames, `approxMB`, `leak` e `drmSuspected`.
 
 ## Critérios de aceite
 - [ ] `gameTime()` é monotônico não decrescente entre frames, sem saltos > 5ms, fora de seek/resync.

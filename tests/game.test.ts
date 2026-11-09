@@ -72,20 +72,77 @@ describe("máquina de estados", () => {
     expect(states).toEqual(["COUNTDOWN", "PLAYING"]);
   });
 
-  it("PLAYING → PAUSED → PLAYING chama pause/resume; pause automático guarda o motivo", () => {
-    const { fx, game, play } = setup();
+  it("PLAYING → PAUSED → RESUMING → PLAYING; pause automático guarda o motivo", () => {
+    const { fx, game, play, now } = setup();
     play();
     game.pause();
     expect(game.state).toBe("PAUSED");
     expect(game.pauseReason).toBe("user");
     expect(fx.pause).toHaveBeenCalledWith("user");
     game.resume();
+    expect(game.state).toBe("RESUMING");
+    expect(fx.resume).not.toHaveBeenCalled();
+    // gameTime congelado (ctx suspensa): a contagem anda pelo relógio de parede.
+    const gt = now();
+    game.tick(gt, 50);
+    game.tick(gt, 50 + CONFIG.RESUME_COUNTDOWN_S);
     expect(game.state).toBe("PLAYING");
     expect(fx.resume).toHaveBeenCalledTimes(1);
     game.pause("buffering");
     expect(game.pauseReason).toBe("buffering");
     game.resume();
     expect(game.pauseReason).toBeNull();
+  });
+
+  it("RESUMING: contagem em segundos de parede, sem julgar notas, e retoma no fim", () => {
+    const { fx, game, play, now } = setup();
+    play();
+    game.onAnalyzerMsg({ type: "note", id: 1, t: now() + 0.5, lane: 0, strength: 1 });
+    game.pause();
+    game.resume();
+    const gt = now();
+    game.tick(gt, 10);
+    expect(game.countdown).toBe(CONFIG.RESUME_COUNTDOWN_S);
+    game.tick(gt, 10 + CONFIG.RESUME_COUNTDOWN_S - 0.4);
+    expect(game.countdown).toBeCloseTo(0.4, 6);
+    // Teclas na contagem não julgam.
+    game.onKeyDown(0, gt + 0.5);
+    game.onKeyUp(0, gt + 0.5);
+    expect(game.stats.perfect + game.stats.good + game.stats.miss).toBe(0);
+    expect(game.state).toBe("RESUMING");
+    expect(fx.resume).not.toHaveBeenCalled();
+    game.tick(gt, 10 + CONFIG.RESUME_COUNTDOWN_S);
+    expect(game.state).toBe("PLAYING");
+    expect(game.countdown).toBeNull();
+    expect(game.pauseReason).toBeNull();
+    expect(fx.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("pause em RESUMING cancela a contagem sem novo fx.pause; o próximo resume recomeça", () => {
+    const { fx, game, play, now } = setup();
+    play();
+    game.pause();
+    game.resume();
+    game.tick(now(), 0);
+    game.tick(now(), 2);
+    game.pause();
+    expect(game.state).toBe("PAUSED");
+    expect(fx.pause).toHaveBeenCalledTimes(1);
+    game.resume();
+    game.tick(now(), 5);
+    expect(game.countdown).toBe(CONFIG.RESUME_COUNTDOWN_S);
+    game.tick(now(), 5 + CONFIG.RESUME_COUNTDOWN_S);
+    expect(game.state).toBe("PLAYING");
+    expect(fx.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("resume de pause por buffering é imediato (sem contagem)", () => {
+    const { fx, game, play } = setup();
+    play();
+    game.pause("buffering");
+    game.resume();
+    expect(game.state).toBe("PLAYING");
+    expect(fx.resume).toHaveBeenCalledTimes(1);
   });
 
   it("pause/resume fora de PLAYING/PAUSED é ignorado", () => {

@@ -18,18 +18,18 @@ export interface GameEffectsDeps {
    * Chamado antes de cada video.play()/pause() iniciado pelo jogo, para main.tsx marcar
    * o evento resultante e não devolvê-lo ao jogo (spec 06).
    */
-  markOwnMediaEvent?: () => void;
+  markOwnMediaEvent?: (kind: "play" | "pause") => void;
   /** Restaura o <video> e remove o overlay (youtube.ts / ui). */
   onTeardown?: () => void;
 }
 
 export function createGameEffects(d: GameEffectsDeps): GameEffects {
   const play = () => {
-    d.markOwnMediaEvent?.();
+    d.markOwnMediaEvent?.("play");
     d.video.play().catch((e: unknown) => warn("video.play() falhou", e));
   };
   const pause = () => {
-    d.markOwnMediaEvent?.();
+    d.markOwnMediaEvent?.("pause");
     d.video.pause();
   };
 
@@ -44,8 +44,10 @@ export function createGameEffects(d: GameEffectsDeps): GameEffects {
       play();
       d.clock.resync();
     },
-    pause() {
-      pause();
+    pause(reason) {
+      // Buffering: o <video> já está parado esperando dados; pausá-lo impediria o
+      // `playing` que dispara o resume automático (spec 06). Só congela o áudio atrasado.
+      if (reason !== "buffering") pause();
       void d.graph.suspend();
     },
     resume() {

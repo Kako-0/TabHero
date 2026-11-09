@@ -61,7 +61,7 @@ mode = "game":          source ──┬──► analyzerNode (AudioWorkletNode
 3. `setMode("passthrough")`: o inverso; envia `set-active: false`.
 4. `flush()`: `delayNode.disconnect()`, cria um `DelayNode` novo, reconecta e envia `{type:"reset", at: ctx.currentTime}`.
 5. `suspend()/resume()`: delegam a `ctx.suspend()/resume()`. O buffer do `DelayNode` é preservado (é o comportamento desejado no pause).
-6. `dispose()`: `setMode("passthrough")` e para o polling de latência. A `ctx` continua viva enquanto a página existir.
+6. `dispose()`: `setMode("passthrough")`, para o polling de latência e **retoma a `ctx` se estiver suspensa** (sair do jogo pausado: com a `ctx` suspensa, o `<video>` ligado à `MediaElementSource` não avança e o YouTube fica em loading eterno). A `ctx` continua viva enquanto a página existir.
 
 ### Latência de saída
 - Fonte primária: `ctx.outputLatency` (Chrome ≥ 102); somar `ctx.baseLatency`.
@@ -78,7 +78,7 @@ Se a `ctx` sair de `running` sem o jogo ter pedido (`interrupted`, ou suspensa p
 - `flush()` também desliga `source → delay antigo` (só `delayNode.disconnect()` deixaria o nó antigo recebendo áudio). Em `passthrough`, o delay novo é criado mas não ligado.
 - `setMode` só liga e desliga arestas; os nós (`delay`, `masterGain`) são criados uma vez por `AudioGraph`.
 - A rampa de latência é o `LatencySmoother` (primeira medida aplicada direto; depois, no máximo 5ms/s nos dois sentidos).
-- Build de dev (`VITE_DEBUG=true`): o clique em "Jogar" já põe o grafo em `game`, para o teste manual de atraso do M0.
+- Build de dev (`VITE_DEBUG=true`): o clique em "Jogar" já põe o grafo em `game`, para o teste manual de atraso do M0. Desde a spec 06, o "Jogar" inicia a partida real (também no build de produção); o log de dev da partida, a cada 2s, traz estado, `gameTime`, desvio, latências A/B, score, combo, frames, `approxMB`, `leak` e `drmSuspected`.
 
 ## Erros e casos de borda
 | Caso | Comportamento |

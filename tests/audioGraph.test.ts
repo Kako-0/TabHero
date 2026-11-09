@@ -238,6 +238,15 @@ describe("dispose", () => {
     expect(ctx.find("source")).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("retoma a ctx suspensa pelo pause (senão o <video> fica preso em loading)", async () => {
+    const { g, ctx } = await attach();
+    g.setMode("game");
+    await g.suspend();
+    expect(ctx.state).toBe("suspended");
+    g.dispose();
+    await vi.waitFor(() => expect(ctx.state).toBe("running"));
+  });
 });
 
 describe("latência de saída", () => {

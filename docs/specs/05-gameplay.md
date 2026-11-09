@@ -7,7 +7,7 @@ Máquina de estados da partida, armazenamento das notas, julgamento de input, su
 
 ```ts
 export type GameState =
-  | "IDLE" | "COUNTDOWN" | "PLAYING" | "PAUSED" | "SYNCING" | "AD" | "RESULTS" | "ERROR";
+  | "IDLE" | "COUNTDOWN" | "PLAYING" | "PAUSED" | "RESUMING" | "SYNCING" | "AD" | "RESULTS" | "ERROR";
 
 export type Judgement = "PERFECT" | "GOOD" | "MISS";
 
@@ -63,9 +63,9 @@ export function createGame(effects?: Partial<GameEffects>, cfg?: GameConfig): Ga
 ```
 IDLE ──start──► COUNTDOWN ──(COUNTDOWN_S)──► PLAYING ──ended──► RESULTS ──exit/start──► IDLE/COUNTDOWN
                                               │  ▲
-                                   pause/     │  │ resume
+                                   pause/     │  │ (RESUME_COUNTDOWN_S) / resume após buffering
                                    waiting    ▼  │
-                                             PAUSED
+                                             PAUSED ──resume──► RESUMING ──pause──► PAUSED
 PLAYING ──seeked──► SYNCING ──(SYNC_AFTER_SEEK_S)──► PLAYING
 PLAYING/SYNCING/COUNTDOWN ──adStarted──► AD ──adEnded──► SYNCING
 qualquer ──exit──► IDLE        qualquer ──erro──► ERROR ──exit──► IDLE
@@ -76,8 +76,10 @@ Ações por transição (orquestradas por `main.tsx`, que chama grafo/vídeo/You
 | Transição | Ações |
 | :--- | :--- |
 | `IDLE → COUNTDOWN` | `graph.setMode("game")`, `video.currentTime = 0`, `video.pause()`, `videoDelay.start()`, zera stats e notas. Em `VIDEO_PLAY_AT_COUNTDOWN_S`: `video.play()` + `clock.resync()` |
-| `→ PAUSED` | `video.pause()` + `graph.suspend()` |
-| `PAUSED → PLAYING` | `graph.resume()` + `video.play()` + `clock.resync()` |
+| `→ PAUSED` | `video.pause()` + `graph.suspend()`. Com `pause("buffering")`, só `graph.suspend()`: o `<video>` já está parado esperando dados, e pausá-lo impediria o `playing` do resume automático |
+| `PAUSED → RESUMING` | Nenhuma: vídeo e grafo seguem parados durante a contagem de `RESUME_COUNTDOWN_S`. Só no pause do usuário; após buffering, o `resume()` vai direto a PLAYING |
+| `RESUMING → PLAYING` (fim da contagem) / `PAUSED → PLAYING` (buffering) | `graph.resume()` + `video.play()` + `clock.resync()` |
+| `RESUMING → PAUSED` (`pause()` na contagem) | Nenhuma: cancela a contagem; o próximo `resume()` recomeça do zero |
 | `→ SYNCING` (seek) | `graph.flush()`, `videoDelay.clear()`, `clock.resync()`, apaga as notas, `combo = 0` |
 | `→ AD` | Análise inativa (`graph.setAnalysisActive(false)`), apaga as notas (o fim da música no buffer toca sem jogo, sem MISS), overlay mostra "Anúncio" |
 | `AD → SYNCING` | `setAnalysisActive(true)` + as mesmas ações do seek (o buffer tem o anúncio), **mas o combo é mantido** |
@@ -87,6 +89,8 @@ Ações por transição (orquestradas por `main.tsx`, que chama grafo/vídeo/You
 `seeked` também vale em SYNCING (reinicia a contagem). `adStarted` vale em PLAYING/SYNCING/COUNTDOWN. `pause` só em PLAYING. `fail` vale em qualquer estado (inclusive IDLE, ex.: `SOURCE_TAKEN` no attach).
 
 **Mensagens em trânsito:** depois de cada flush (seek, fim de anúncio), o jogo ignora mensagens do analisador até o `reset-ack` (podem ser de áudio de antes do reset).
+
+**Contagem ao retomar (RESUMING):** a `ctx` está suspensa e o `gameTime` congelado, então a contagem é medida no relógio de parede: `tick(gameTime, wallTime)`, com `wallTime` em segundos (`performance.now()/1000`; padrão: `gameTime`, para os testes). Em RESUMING as teclas não julgam notas, e `countdown` expõe os segundos restantes. `ended` vale em RESUMING como em PAUSED.
 
 `waiting` (buffering do YouTube) é tratado como pause automático (`pause("buffering")`); `playing` subsequente → resume automático (sem menu de pause).
 
@@ -121,7 +125,7 @@ Ações por transição (orquestradas por `main.tsx`, que chama grafo/vídeo/You
 - [x] Sustain de 1s segurado inteiro: `ticksAwarded = 10` (± 1).
 - [x] Seek durante PLAYING → SYNCING → PLAYING; o combo zera e o score se mantém.
 - [x] Anúncio no meio → AD → SYNCING → PLAYING sem notas do anúncio.
-- [x] Fim do vídeo → RESULTS só depois de o último áudio atrasado tocar (com `endAt` = procTime do fim). **Pendente:** ligar em `main.tsx` (spec 06) e conferir no YouTube.
+- [x] Fim do vídeo → RESULTS só depois de o último áudio atrasado tocar (com `endAt` = procTime do fim). Ligado em `main.tsx` (spec 06: `ended` → `ended(ctx.currentTime)`); **pendente:** conferir no YouTube.
 
 ## Testes
 Vitest com relógio manual, sem DOM: sequências de `onAnalyzerMsg`/`onKeyDown`/`tick` com resultados esperados.

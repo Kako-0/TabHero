@@ -51,10 +51,11 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: {
 | Estado | Tela |
 | :--- | :--- |
 | `COUNTDOWN` | "3", "2", "1", "VAI!" grandes e centralizados; as letras D F J K nos alvos |
+| `RESUMING` | "3", "2", "1" grandes e centralizados sobre o último frame (escurecimento normal, `VIDEO_DIM`); Espaço/Esc cancela e volta ao menu de pausa |
 | `PAUSED` | "Pausado" + botões **Continuar** (Espaço) e **Sair**; dica: "F, J e K do YouTube estão desativados durante o jogo" |
 | `SYNCING` | "Sincronizando…" com barra de 1,5s |
 | `AD` | Faixa discreta no topo: "Anúncio — o jogo continua depois"; `pointer-events: none` |
-| `RESULTS` | Score, precisão `(perfect + 0,5·good) / total`, Perfect/Good/Miss, maior combo; botões **Jogar de novo** e **Sair** |
+| `RESULTS` | Score, precisão `(perfect + 0,5·good) / total`, Perfect/Good/Miss, maior combo; botões **Jogar de novo**, **Próxima música** (só se houver próximo vídeo; ver 06) e **Sair** |
 | `ERROR` | Mensagem de `strings.ts` (ex.: `SOURCE_TAKEN`) + **Sair** |
 | (qualquer estado, vídeo mudo ou volume 0) | Faixa no topo: "Ative o som do vídeo para jogar" (`role="status"`). Some quando o som volta (`volumechange`). Ver 01, SPIKE 2 |
 

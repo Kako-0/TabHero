@@ -5,6 +5,7 @@ export const CONFIG = {
   DELAY_S: 1.5, // atraso do áudio e do vídeo
   VISIBLE_LEAD_S: 1.25, // quanto tempo a nota leva do topo da pista até a linha de acerto
   COUNTDOWN_S: 3.0,
+  RESUME_COUNTDOWN_S: 3.0, // contagem ao sair do pause (relógio de parede: a ctx está suspensa)
   VIDEO_PLAY_AT_COUNTDOWN_S: 1.5, // video.play() nesse instante da contagem → som começa no "GO"
   SYNC_AFTER_SEEK_S: 1.5,
 

@@ -5,7 +5,7 @@ import { CONFIG } from "@/shared/config";
 import type { AnalyzerMsg, Lane } from "@/shared/types";
 
 export type GameState =
-  "IDLE" | "COUNTDOWN" | "PLAYING" | "PAUSED" | "SYNCING" | "AD" | "RESULTS" | "ERROR";
+  "IDLE" | "COUNTDOWN" | "PLAYING" | "PAUSED" | "RESUMING" | "SYNCING" | "AD" | "RESULTS" | "ERROR";
 
 export type Judgement = "PERFECT" | "GOOD" | "MISS";
 
@@ -56,7 +56,7 @@ export interface Game {
   readonly stats: GameStats;
   /** Motivo do PAUSED (buffering = pause automático, sem menu). */
   readonly pauseReason: PauseReason | null;
-  /** Segundos que faltam na contagem (só em COUNTDOWN). */
+  /** Segundos que faltam na contagem (só em COUNTDOWN e RESUMING). */
   readonly countdown: number | null;
   readonly errorCode: string | null;
   /**
@@ -71,11 +71,17 @@ export interface Game {
   onAnalyzerMsg(m: AnalyzerMsg): void;
   onKeyDown(lane: Lane, gameTime: number): void;
   onKeyUp(lane: Lane, gameTime: number): void;
-  tick(gameTime: number): void; // a cada rAF
+  /**
+   * A cada rAF. `wallTime` (s, relógio de parede, ex.: performance.now()/1000) mede a
+   * contagem do RESUMING, em que o gameTime está congelado (ctx suspensa). Padrão: gameTime.
+   */
+  tick(gameTime: number, wallTime?: number): void;
 
   // eventos do player/controle (vêm de main.tsx)
   start(): void;
+  /** PLAYING → PAUSED; em RESUMING, cancela a contagem e volta a PAUSED. */
   pause(reason?: PauseReason): void;
+  /** PAUSED → RESUMING (contagem) → PLAYING; pause por buffering volta direto a PLAYING. */
   resume(): void;
   seeked(): void;
   adStarted(): void;
@@ -92,6 +98,7 @@ export type GameConfig = Pick<
   typeof CONFIG,
   | "DELAY_S"
   | "COUNTDOWN_S"
+  | "RESUME_COUNTDOWN_S"
   | "VIDEO_PLAY_AT_COUNTDOWN_S"
   | "SYNC_AFTER_SEEK_S"
   | "LANES"
@@ -150,6 +157,8 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
   /** gameTime do 1º tick no estado temporizado atual (COUNTDOWN/SYNCING). */
   let phaseStart: number | null = null;
   let countdownLeft: number | null = null;
+  /** wallTime do 1º tick em RESUMING. */
+  let resumeStart: number | null = null;
   let playbackStarted = false;
   /** procTime a partir do qual o jogo vai para RESULTS (definido em `ended`). */
   let endAt: number | null = null;
@@ -264,7 +273,7 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
       return pauseReason;
     },
     get countdown() {
-      return state === "COUNTDOWN" ? countdownLeft : null;
+      return state === "COUNTDOWN" || state === "RESUMING" ? countdownLeft : null;
     },
     get errorCode() {
       return errorCode;
@@ -358,9 +367,21 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
       }
     },
 
-    tick(gt) {
+    tick(gt, wall = gt) {
       lastGt = gt;
       switch (state) {
+        case "RESUMING": {
+          resumeStart ??= wall;
+          const elapsed = wall - resumeStart;
+          countdownLeft = Math.max(0, cfg.RESUME_COUNTDOWN_S - elapsed);
+          if (elapsed >= cfg.RESUME_COUNTDOWN_S) {
+            resumeStart = null;
+            pauseReason = null;
+            fx.resume();
+            setState("PLAYING");
+          }
+          break;
+        }
         case "COUNTDOWN": {
           phaseStart ??= gt;
           const elapsed = gt - phaseStart;
@@ -401,6 +422,13 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
     },
 
     pause(reason = "user") {
+      if (state === "RESUMING") {
+        // Vídeo e grafo ainda estão parados: só cancela a contagem.
+        resumeStart = null;
+        countdownLeft = null;
+        setState("PAUSED");
+        return;
+      }
       if (state !== "PLAYING") return;
       pauseReason = reason;
       // Teclas soltas durante o pause (blur, menu) não geram keyup: começa limpo.
@@ -412,9 +440,17 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
 
     resume() {
       if (state !== "PAUSED") return;
-      pauseReason = null;
-      fx.resume();
-      setState("PLAYING");
+      if (pauseReason === "buffering") {
+        // Automático (o <video> já voltou a tocar): sem contagem.
+        pauseReason = null;
+        fx.resume();
+        setState("PLAYING");
+        return;
+      }
+      // Contagem com tudo parado; o fx.resume() sai no fim dela (tick).
+      resumeStart = null;
+      countdownLeft = cfg.RESUME_COUNTDOWN_S;
+      setState("RESUMING");
     },
 
     seeked() {
@@ -442,7 +478,8 @@ export function createGame(effects: Partial<GameEffects> = {}, cfg: GameConfig =
     },
 
     ended(at) {
-      if (state !== "PLAYING" && state !== "SYNCING" && state !== "PAUSED") return;
+      if (state !== "PLAYING" && state !== "SYNCING" && state !== "PAUSED" && state !== "RESUMING")
+        return;
       endAt = at ?? (lastGt ?? 0) + cfg.DELAY_S;
     },
 

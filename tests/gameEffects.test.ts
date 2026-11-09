@@ -56,17 +56,17 @@ describe("ações por transição (spec 05)", () => {
     expect(calls).toEqual([
       "graph.setMode(game)",
       "video.currentTime=0",
-      "mark",
+      "mark(pause)",
       "video.pause",
       "videoDelay.start",
     ]);
     calls.length = 0;
     game.tick(0);
     game.tick(CONFIG.VIDEO_PLAY_AT_COUNTDOWN_S);
-    expect(calls).toEqual(["mark", "video.play", "clock.resync"]);
+    expect(calls).toEqual(["mark(play)", "video.play", "clock.resync"]);
   });
 
-  it("→ PAUSED e PAUSED → PLAYING (play só depois da ctx retomar)", async () => {
+  it("→ PAUSED e PAUSED → RESUMING → PLAYING (play só depois da ctx retomar)", async () => {
     const { d, calls } = deps();
     const game = createGame(createGameEffects(d));
     game.start();
@@ -74,12 +74,27 @@ describe("ações por transição (spec 05)", () => {
     game.tick(CONFIG.COUNTDOWN_S);
     calls.length = 0;
     game.pause();
-    expect(calls).toEqual(["mark", "video.pause", "graph.suspend"]);
+    expect(calls).toEqual(["mark(pause)", "video.pause", "graph.suspend"]);
     calls.length = 0;
     game.resume();
+    // Contagem: nada é retomado até o fim dela.
+    game.tick(CONFIG.COUNTDOWN_S, 0);
+    expect(calls).toEqual([]);
+    game.tick(CONFIG.COUNTDOWN_S, CONFIG.RESUME_COUNTDOWN_S);
     expect(calls).toEqual(["graph.resume"]);
     await microtasks();
-    expect(calls).toEqual(["graph.resume", "mark", "video.play", "clock.resync"]);
+    expect(calls).toEqual(["graph.resume", "mark(play)", "video.play", "clock.resync"]);
+  });
+
+  it("pause por buffering: só suspende o grafo (o <video> segue esperando dados)", () => {
+    const { d, calls } = deps();
+    const game = createGame(createGameEffects(d));
+    game.start();
+    game.tick(0);
+    game.tick(CONFIG.COUNTDOWN_S);
+    calls.length = 0;
+    game.pause("buffering");
+    expect(calls).toEqual(["graph.suspend"]);
   });
 
   it("→ SYNCING (seek): flush do grafo, clear do vídeo e resync", () => {
