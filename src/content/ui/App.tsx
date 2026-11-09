@@ -1,5 +1,6 @@
 // Telas por estado (spec 07). Versão funcional mínima da spec 06; o visual final vem no M2/M4.
 import type { GameState, GameStats, PauseReason } from "@/content/game/game";
+import { CONFIG } from "@/shared/config";
 import { STRINGS } from "@/shared/strings";
 
 export interface GameView {
@@ -11,6 +12,8 @@ export interface GameView {
   errorCode: string | null;
   /** Em RESULTS: há próximo vídeo (playlist, mix, autoplay) para o botão "Próxima música". */
   hasNext?: boolean;
+  /** Muda a cada (re)início do SYNCING (seek de novo reinicia a barra). */
+  syncId?: number;
 }
 
 export interface AppActions {
@@ -67,7 +70,7 @@ function Screen({ view, actions }: { view: GameView; actions: AppActions | undef
           <h2>{STRINGS.paused}</h2>
           <div className="tabhero-buttons">
             <button onClick={actions?.onResume} autoFocus>
-              {STRINGS.continue}
+              {STRINGS.continue} <kbd>{STRINGS.spaceKey}</kbd>
             </button>
             <button onClick={actions?.onExit}>{STRINGS.exit}</button>
           </div>
@@ -75,7 +78,17 @@ function Screen({ view, actions }: { view: GameView; actions: AppActions | undef
         </div>
       );
     case "SYNCING":
-      return <div className="tabhero-msg">{STRINGS.syncing}</div>;
+      return (
+        <div className="tabhero-sync" role="status">
+          <div className="tabhero-msg">{STRINGS.syncing}</div>
+          <div className="tabhero-bar" aria-hidden="true">
+            <div
+              key={view.syncId ?? 0}
+              style={{ animationDuration: `${CONFIG.SYNC_AFTER_SEEK_S}s` }}
+            />
+          </div>
+        </div>
+      );
     case "AD":
       return (
         <div className="tabhero-banner tabhero-ad" role="status">

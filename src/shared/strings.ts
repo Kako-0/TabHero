@@ -6,6 +6,7 @@ export const STRINGS = {
   go: "VAI!",
   paused: "Pausado",
   continue: "Continuar",
+  spaceKey: "Espaço",
   exit: "Sair",
   playAgain: "Jogar de novo",
   nextSong: "Próxima música",
@@ -19,6 +20,7 @@ export const STRINGS = {
   good: "Good",
   miss: "Miss",
   maxCombo: "Maior combo",
+  combo: "combo",
   errors: {
     SOURCE_TAKEN:
       "Outra extensão de áudio está usando este vídeo. Desative-a e recarregue a página.",

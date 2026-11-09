@@ -42,12 +42,31 @@ const CSS = `
 }
 .tabhero-buttons button:first-child { background: #fff; color: #000; }
 .tabhero-buttons button:focus-visible { outline: 3px solid #fde047; outline-offset: 2px; }
+.tabhero-buttons kbd {
+  font: inherit; font-size: 12px; font-weight: 600; margin-left: 6px;
+  padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; opacity: 0.75;
+}
+.tabhero-sync { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.tabhero-bar {
+  width: 240px; max-width: 60vw; height: 6px; border-radius: 3px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.25);
+}
+.tabhero-bar > div {
+  height: 100%; width: 100%; background: #fff; transform-origin: left;
+  animation: tabhero-fill linear forwards;
+}
+@keyframes tabhero-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .tabhero-hint { margin: 16px 0 0; font-size: 13px; color: #d4d4d4; }
 `;
 
+/** Resolução do canvas: tamanho CSS × devicePixelRatio, limitado a 2. */
+const MAX_DPR = 2;
+
 export interface OverlayHandle {
-  /** Canvas do jogo (spec 07), atrás da UI React. */
+  /** Canvas do jogo (spec 07), atrás da UI React. Redimensionado com o host (ResizeObserver). */
   readonly canvas: HTMLCanvasElement;
+  /** Chamado depois de cada redimensionamento do canvas (que apaga o conteúdo). */
+  onResize(fn: () => void): void;
   update(props: AppProps): void;
   unmount(): void;
 }
@@ -68,12 +87,31 @@ export function mountOverlay(host: HTMLElement, props: AppProps): OverlayHandle 
   const root: Root = createRoot(container);
   root.render(<App {...props} />);
 
+  const resizeListeners: (() => void)[] = [];
+  const ro = new ResizeObserver((entries) => {
+    const box = entries[entries.length - 1]?.contentRect;
+    if (!box) return;
+    const dpr = Math.min(MAX_DPR, devicePixelRatio || 1);
+    const w = Math.round(box.width * dpr);
+    const h = Math.round(box.height * dpr);
+    if (canvas.width === w && canvas.height === h) return;
+    canvas.width = w;
+    canvas.height = h;
+    for (const fn of resizeListeners) fn();
+  });
+  ro.observe(host);
+
   return {
     canvas,
+    onResize(fn) {
+      resizeListeners.push(fn);
+    },
     update(next) {
       root.render(<App {...next} />);
     },
     unmount() {
+      ro.disconnect();
+      resizeListeners.length = 0;
       root.unmount();
       shadow.replaceChildren();
     },

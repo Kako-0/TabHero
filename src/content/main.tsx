@@ -6,7 +6,8 @@ import { DEBUG, error, log } from "@/shared/log";
 import type { Lane } from "@/shared/types";
 import { AudioGraph, AudioGraphError } from "./audioGraph";
 import { createClock } from "./clock";
-import { createGame, type Game } from "./game/game";
+import { createGame, type Game, type GameState } from "./game/game";
+import { createRenderer, NOTES_BEHIND_S, type RenderState } from "./game/render";
 import { createGameEffects } from "./gameEffects";
 import { isSoundOff, watchSound } from "./soundCheck";
 import type { AppProps, GameView } from "./ui/App";
@@ -23,6 +24,16 @@ import {
 /** Escurecimento do vídeo atrasado em PAUSED/SYNCING (spec 07). */
 const DIM_PAUSED = 0.7;
 const DEBUG_LOG_MS = 2000;
+/** Estados em que o rAF fica rodando (spec 07: o rAF só roda com o jogo ativo). */
+const LOOP_STATES: ReadonlySet<GameState> = new Set<GameState>([
+  "COUNTDOWN",
+  "PLAYING",
+  "PAUSED",
+  "RESUMING",
+  "SYNCING",
+  "AD",
+]);
+const noop = () => {};
 /**
  * O jogo pausa o vídeo a isso do fim: sem `ended`, o YouTube não avança (autoplay, mix,
  * playlist) e a tela de resultados fica até o usuário escolher. > 0,25s: o `timeupdate`
@@ -74,6 +85,10 @@ function startSession(p: YouTubePlayer): Session {
   let soundOff = isSoundOff(video);
   /** O jogo pausou o vídeo a HOLD_END_S do fim (o YouTube ainda não viu o `ended`). */
   let heldAtEnd = false;
+  /** Barra do "Sincronizando…": muda a cada (re)início do SYNCING. */
+  let syncId = 0;
+  /** Agenda um rAF se o loop estiver parado (definido quando o jogo existe). */
+  let kickLoop: () => void = noop;
 
   const actions = {
     onResume: () => game?.resume(),
@@ -102,6 +117,7 @@ function startSession(p: YouTubePlayer): Session {
         pauseReason: game.pauseReason,
         errorCode: game.errorCode,
         hasNext: state === "RESULTS" && p.hasNext(),
+        syncId,
       };
       // AD: o vídeo do anúncio aparece ao vivo por baixo (spec 06).
       canvas.style.visibility = state === "AD" ? "hidden" : "visible";
@@ -168,6 +184,8 @@ function startSession(p: YouTubePlayer): Session {
     game = gm;
     gm.on("state", (st) => {
       if (st === "COUNTDOWN") heldAtEnd = false;
+      if (st === "SYNCING") syncId++;
+      kickLoop();
       if (DEBUG) log("jogo:", st, { score: gm.stats.score });
       renderUi();
     });
@@ -211,7 +229,13 @@ function startSession(p: YouTubePlayer): Session {
         "seeking",
         () => {
           heldAtEnd = false;
+          // Seek de novo durante o SYNCING: a contagem recomeça (a barra também).
+          const again = gm.state === "SYNCING";
           gm.seeked();
+          if (again) {
+            syncId++;
+            renderUi();
+          }
         },
       ],
       ["timeupdate", checkEnd],
@@ -265,14 +289,26 @@ function startSession(p: YouTubePlayer): Session {
       }),
     );
 
-    // Loop (rAF): relógio → jogo → vídeo atrasado no canvas. Notas/HUD: spec 07.
-    let drawn: ImageBitmap | null = null;
-    let drawnDim = -1;
-    let everDrawn = false;
+    // Loop (rAF): relógio → jogo → render (spec 07). Só roda nos estados de jogo; fora
+    // deles (RESULTS, ERROR, IDLE) desenha um frame a cada pedido (estado, resize) e para.
+    const reducedMotionMq = matchMedia("(prefers-reduced-motion: reduce)");
+    const renderer = createRenderer({ reducedMotion: () => reducedMotionMq.matches });
+    const pressed: boolean[] = new Array<boolean>(CONFIG.LANES).fill(false);
+    const rs: RenderState = {
+      now: 0,
+      frame: null,
+      notes: [],
+      pressed,
+      feedback: (lane) => gm.lastJudgement(lane),
+      stats: gm.stats,
+      dim: CONFIG.VIDEO_DIM,
+    };
+    let drmShown = false;
     let lastCountdown: number | null = null;
     let lastLog = 0;
     let raf = 0;
     const tick = (now: number) => {
+      raf = 0;
       clock.sample();
       const gt = clock.gameTime();
       // Relógio de parede: conta o RESUMING, em que o gameTime está congelado.
@@ -285,36 +321,20 @@ function startSession(p: YouTubePlayer): Session {
         renderUi();
       }
 
-      const dpr = Math.min(2, devicePixelRatio);
-      const w = Math.round(canvas.clientWidth * dpr);
-      const h = Math.round(canvas.clientHeight * dpr);
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        drawn = null;
+      // AD: o canvas fica escondido (o anúncio aparece ao vivo por baixo).
+      if (gm.state !== "AD") {
+        // DRM: os frames capturados são pretos; o render volta ao gradiente neutro.
+        const drm = vd.drmSuspected;
+        if (drm && !drmShown) renderer.forgetFrame();
+        drmShown = drm;
+        for (let l = 0; l < CONFIG.LANES; l++) pressed[l] = gm.isPressed(l as Lane);
+        rs.now = gt;
+        rs.frame = drm ? null : vd.frameAt(gt);
+        rs.notes = gm.visibleNotes(gt - NOTES_BEHIND_S, gt + CONFIG.VISIBLE_LEAD_S);
+        rs.stats = gm.stats;
+        rs.dim = gm.state === "PAUSED" || gm.state === "SYNCING" ? DIM_PAUSED : CONFIG.VIDEO_DIM;
+        renderer.renderFrame(c2d, rs);
       }
-      const dim = gm.state === "PAUSED" || gm.state === "SYNCING" ? DIM_PAUSED : CONFIG.VIDEO_DIM;
-      const frame = vd.frameAt(gt);
-      if (frame && (frame !== drawn || dim !== drawnDim)) {
-        // cover
-        const sc = Math.max(w / frame.width, h / frame.height);
-        const fw = frame.width * sc;
-        const fh = frame.height * sc;
-        c2d.drawImage(frame, (w - fw) / 2, (h - fh) / 2, fw, fh);
-        c2d.fillStyle = `rgba(0,0,0,${dim})`;
-        c2d.fillRect(0, 0, w, h);
-        drawn = frame;
-        drawnDim = dim;
-        everDrawn = true;
-      } else if (!frame && (!everDrawn || drawn === null)) {
-        // Nunca houve frame (início, DRM) ou o canvas foi redimensionado: fundo neutro.
-        c2d.fillStyle = "#111";
-        c2d.fillRect(0, 0, w, h);
-        everDrawn = true;
-        drawn = null;
-        drawnDim = -1;
-      }
-      // Sem frame após seek: mantém o último desenhado (os bitmaps podem já estar fechados).
 
       if (DEBUG && now - lastLog >= DEBUG_LOG_MS) {
         lastLog = now;
@@ -334,15 +354,22 @@ function startSession(p: YouTubePlayer): Session {
           drmSuspected: vd.drmSuspected,
         });
       }
-      raf = requestAnimationFrame(tick);
+      if (!closed && LOOP_STATES.has(gm.state)) raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    cleanups.push(() => cancelAnimationFrame(raf));
+    kickLoop = () => {
+      if (!closed && raf === 0) raf = requestAnimationFrame(tick);
+    };
+    ov.onResize(kickLoop);
+    cleanups.push(() => {
+      cancelAnimationFrame(raf);
+      kickLoop = noop;
+    });
 
     p.setGameActive(true);
     // Anúncio na hora do clique: espera o fim dele para começar (ad-end → start).
     if (!p.isAdShowing()) gm.start();
     renderUi();
+    kickLoop();
   })();
 
   return s;
