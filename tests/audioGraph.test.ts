@@ -180,6 +180,20 @@ describe("flush", () => {
   });
 });
 
+describe("setAnalysisActive", () => {
+  it("envia set-active sem mudar o roteamento", async () => {
+    const { g, ctx, worklet } = await attach();
+    g.setMode("game");
+    const before = liveDelays(ctx);
+    g.setAnalysisActive(false);
+    expect(worklet.port.sent.at(-1)).toEqual({ type: "set-active", active: false });
+    expect(liveDelays(ctx)).toEqual(before);
+    g.setAnalysisActive(true);
+    expect(worklet.port.sent.at(-1)).toEqual({ type: "set-active", active: true });
+    g.dispose();
+  });
+});
+
 describe("suspend/resume e statechange", () => {
   it("suspend pedido pelo jogo não emite context-interrupted", async () => {
     const { g, ctx } = await attach();

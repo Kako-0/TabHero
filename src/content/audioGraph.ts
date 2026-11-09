@@ -212,6 +212,12 @@ export class AudioGraph extends EventTarget {
     this.send({ type: "reset", at: this.ctx.currentTime });
   }
 
+  /** Liga/desliga a análise sem mexer no roteamento (anúncio: spec 05, estado AD). */
+  setAnalysisActive(active: boolean): void {
+    if (this.disposed) return;
+    this.send({ type: "set-active", active });
+  }
+
   async suspend(): Promise<void> {
     this.suspendRequested = true;
     await this.ctx.suspend();

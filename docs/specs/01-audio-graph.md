@@ -22,6 +22,8 @@ export interface AudioGraph {
   setMode(mode: GraphMode): void;
   /** Recria o DelayNode (descarta o áudio no buffer) e envia `reset` ao analisador. */
   flush(): void;
+  /** Envia `set-active` sem mudar o roteamento (anúncio: estado AD da spec 05). */
+  setAnalysisActive(active: boolean): void;
   suspend(): Promise<void>;
   resume(): Promise<void>;
   /** Latência de saída estimada (s), atualizada a cada OUTPUT_LATENCY_POLL_MS. */
