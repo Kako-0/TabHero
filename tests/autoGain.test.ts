@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AutoGain, type AutoGainConfig } from "@/analysis/autoGain";
-import { StreamAnalyzer } from "@/analysis/streamAnalyzer";
+import { createStreamAnalyzer } from "@/analysis/streamAnalyzer";
 
 const SR = 48000;
 const BLOCK = 128;
@@ -117,7 +117,7 @@ describe("AutoGain", () => {
   });
 
   it("StreamAnalyzer aceita o sample rate de entrada", () => {
-    const a = new StreamAnalyzer(SR);
+    const a = createStreamAnalyzer(SR);
     expect(a.push(new Float32Array(BLOCK), 0)).toEqual([]);
   });
 });

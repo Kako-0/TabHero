@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StreamAnalyzer } from "@/analysis/streamAnalyzer";
+import { createStreamAnalyzer } from "@/analysis/streamAnalyzer";
 import { CONFIG } from "@/shared/config";
 import type { AnalyzerMsg, Lane } from "@/shared/types";
 import { installAudioContextMock } from "./setup";
@@ -10,15 +10,15 @@ describe("smoke", () => {
     expect(CONFIG.KEYS).toHaveLength(CONFIG.LANES);
   });
 
-  it("streamAnalyzer stub não gera notas", () => {
-    const a = new StreamAnalyzer();
+  it("streamAnalyzer não gera notas com silêncio", () => {
+    const a = createStreamAnalyzer(CONFIG.ANALYSIS_SR);
     expect(a.push(new Float32Array(CONFIG.HOP), 0)).toEqual([]);
   });
 
   it("reset responde reset-ack", () => {
     const lane: Lane = 0;
-    const a = new StreamAnalyzer();
-    const msgs: AnalyzerMsg[] = a.command({ type: "reset", at: 1.25 });
+    const a = createStreamAnalyzer(CONFIG.ANALYSIS_SR);
+    const msgs: AnalyzerMsg[] = a.reset(1.25);
     expect(msgs).toEqual([{ type: "reset-ack", at: 1.25 }]);
     expect(lane).toBe(0);
   });

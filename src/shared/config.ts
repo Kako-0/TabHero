@@ -16,7 +16,11 @@ export const CONFIG = {
   AGC_TAU_S: 3,
   AGC_MAX_GAIN: 1000, // +60 dB
   AGC_SILENCE_RMS: 1e-5, // −100 dBFS: abaixo disso o ganho fica congelado
+  ONSET_K: 1.5, // threshold adaptativo: mediana + K·MAD + δ (spec 04)
+  ONSET_DELTA_RATIO: 0.1, // δ = ONSET_DELTA_RATIO · máximo móvel
   ONSET_MIN_GAP_S: 0.06,
+  ONSET_ENERGY_GATE: 0.8, // onset exige rms(depois) ≥ gate·rms(antes): descarta fins de nota
+  ANALYZER_OFFSET_S: -0.016, // t da nota = procTime do pico − offset (sintéticos: −17ms clicks, −14ms tons; refinar na suíte 08)
   LANE_MIN_GAP_S: 0.1,
   MAX_NOTES_PER_S: 8,
   LANE_WINDOW_S: 8,
@@ -24,6 +28,7 @@ export const CONFIG = {
   SUSTAIN_MIN_S: 0.4,
   SUSTAIN_ENERGY_RATIO: 0.6,
   SUSTAIN_PITCH_TOLERANCE_SEMITONES: 1,
+  SUSTAIN_MIN_CLARITY: 0.6,
   SUSTAIN_EXTEND_INTERVAL_S: 0.05,
 
   LANES: 4,
